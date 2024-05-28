@@ -4,9 +4,11 @@ from tkinter import Tk, messagebox
 from tkinter.filedialog import askopenfilename
 import os
 import re  # Import the regular expressions library
+import polib  # Import the polib library for parsing .po files
+from openpyxl import Workbook  # Import the openpyxl library for creating Excel files
 
 def element_to_string(element):
-    """Convert an XML element and its children to a string."""
+    #Convert an XML element and its children to a string.
     if element is None:
         return ""
     parts = [element.text] + [ET.tostring(child, encoding='unicode') for child in element]
@@ -49,8 +51,24 @@ def parse_xlf(file_path):
     
     return source_lang, target_lang, source_texts, target_texts
 
-# Function to write source and target texts to a .txt file
-def write_to_txt(file_path, source_lang, target_lang, source_texts, target_texts):
+# Function to parse the .po file and extract source and target texts
+def parse_po(file_path):
+    po = polib.pofile(file_path)
+    
+    source_lang = po.metadata.get('Language')
+    target_lang = 'en'  # Assuming the target language is English
+    
+    source_texts = []
+    target_texts = []
+    
+    for entry in po:
+        source_texts.append(entry.msgid)
+        target_texts.append(entry.msgstr)
+    
+    return source_lang, target_lang, source_texts, target_texts
+
+# Function to write source and target texts to a .txt file and an Excel file
+def write_to_files(file_path, source_lang, target_lang, source_texts, target_texts):
     # Filter out any pairs where both source and target texts are empty or whitespace
     filtered_data = [(source, target) for source, target in zip(source_texts, target_texts)
                      if source.strip() or target.strip()]
@@ -64,15 +82,32 @@ def write_to_txt(file_path, source_lang, target_lang, source_texts, target_texts
         target_lang: filtered_target_texts
     })
     
+    # Write to .txt file
     txt_file_path = os.path.splitext(file_path)[0] + '.txt'
     df.to_csv(txt_file_path, sep='\t', index=False)
-    return txt_file_path
+    
+    # Write to Excel file
+    excel_file_path = os.path.splitext(file_path)[0] + '.xlsx'
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Source and Target"
+    
+    ws.cell(row=1, column=1, value="Source")
+    ws.cell(row=1, column=2, value="Target")
+    
+    for i, (source, target) in enumerate(zip(filtered_source_texts, filtered_target_texts), start=2):
+        ws.cell(row=i, column=1, value=source)
+        ws.cell(row=i, column=2, value=target)
+    
+    wb.save(excel_file_path)
+    
+    return txt_file_path, excel_file_path
 
 # Function to prompt user for file selection
 def choose_file():
     Tk().withdraw()  # Hide the root window
     file_path = askopenfilename(
-        filetypes=[("XLIFF files", "*.xlf .sdlxliff .mxliff .mqxliff"), ("All files", "*.*")]
+        filetypes=[("Translation files", "*.xlf .sdlxliff .mxliff .mqxliff *.po"), ("All files", "*.*")]
     )
     return file_path
 
@@ -80,9 +115,17 @@ def choose_file():
 def main():
     file_path = choose_file()
     if file_path:
-        source_lang, target_lang, source_texts, target_texts = parse_xlf(file_path)
-        txt_file_path = write_to_txt(file_path, source_lang, target_lang, source_texts, target_texts)
-        messagebox.showinfo("Information", f"File '{txt_file_path}' created successfully!")
+        _, file_extension = os.path.splitext(file_path)
+        if file_extension in ['.xlf', '.sdlxliff', '.mxliff', '.mqxliff']:
+            source_lang, target_lang, source_texts, target_texts = parse_xlf(file_path)
+        elif file_extension == '.po':
+            source_lang, target_lang, source_texts, target_texts = parse_po(file_path)
+        else:
+            messagebox.showerror("Error", "Unsupported file format.")
+            return
+        
+        txt_file_path, excel_file_path = write_to_files(file_path, source_lang, target_lang, source_texts, target_texts)
+        messagebox.showinfo("Information", f"Files '{txt_file_path}' and '{excel_file_path}' created successfully!")
 
 if __name__ == "__main__":
     main()
