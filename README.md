@@ -35,4 +35,4 @@ The script assumes the XLIFF file follows standard structure with <source> and <
 Tags within the extracted texts are removed for the output to be only plain text in the .txt file.
 
 ## License
-This project is governed by the GNU Affero General Public License v3.0. For comprehensive details, kindly refer to the LICENSE file included with this project.
+This project is governed by the CC BY-NC 4.0 license. For comprehensive details, kindly refer to the LICENSE file included with this project.
